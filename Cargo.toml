@@ -3,6 +3,8 @@ name = "claude-switch"
 version = "0.1.0"
 edition = "2021"
 description = "Manage and switch between multiple Claude Code accounts on macOS"
+license = "MIT"
+repository = "https://github.com/fansilva1991/claude-switch"
 
 [[bin]]
 name = "claude-switch"

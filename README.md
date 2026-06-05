@@ -36,7 +36,21 @@ claude-switch current            print the active account
 
 Add `--no-launch` to any switch to update the credential without starting Claude.
 
-## Build
+## Install
+
+Homebrew (macOS):
+
+```
+brew install fansilva1991/tap/claude-switch
+```
+
+Or with Cargo (needs the Rust toolchain):
+
+```
+cargo install --git https://github.com/fansilva1991/claude-switch
+```
+
+## Build from source
 
 ```
 cargo build --release   # → target/release/claude-switch
