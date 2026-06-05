@@ -1,0 +1,94 @@
+name: release
+
+# Cut a release by pushing a version tag that matches Cargo.toml, e.g.:
+#   git tag v0.2.0 && git push origin v0.2.0
+#
+# This workflow then:
+#   1. checks the tag matches the version in Cargo.toml,
+#   2. runs the test suite,
+#   3. creates (or updates) the GitHub Release,
+#   4. bumps url + sha256 in the Homebrew tap formula and pushes it.
+#
+# Requires a repo secret HOMEBREW_TAP_TOKEN: a PAT with Contents:write on
+# fansilva1991/homebrew-tap (see the README "Releasing" section).
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+env:
+  TAP_REPO: fansilva1991/homebrew-tap
+  FORMULA_PATH: Formula/claude-switch.rb
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Verify tag matches Cargo.toml version
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          cargo_ver="$(grep -m1 '^version' Cargo.toml | sed -E 's/.*"(.*)".*/\1/')"
+          echo "tag=$tag cargo=$cargo_ver"
+          if [ "$tag" != "$cargo_ver" ]; then
+            echo "::error::Tag v$tag does not match Cargo.toml version $cargo_ver. Bump Cargo.toml first."
+            exit 1
+          fi
+
+      - name: Run tests
+        run: cargo test --locked
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; skipping creation."
+          else
+            gh release create "$GITHUB_REF_NAME" \
+              --title "$GITHUB_REF_NAME" \
+              --generate-notes
+          fi
+
+      - name: Compute source tarball sha256
+        id: sha
+        run: |
+          url="https://github.com/${GITHUB_REPOSITORY}/archive/refs/tags/${GITHUB_REF_NAME}.tar.gz"
+          # GitHub may take a moment to materialize the archive; retry briefly.
+          for i in 1 2 3 4 5; do
+            if curl -fsSL "$url" -o source.tar.gz; then break; fi
+            echo "archive not ready yet (attempt $i), waiting..."; sleep 5
+          done
+          sha="$(sha256sum source.tar.gz | cut -d' ' -f1)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha"
+
+      - name: Bump Homebrew formula
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          NEW_URL: ${{ steps.sha.outputs.url }}
+          NEW_SHA: ${{ steps.sha.outputs.sha }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::error::HOMEBREW_TAP_TOKEN secret is not set; cannot update the tap."
+            exit 1
+          fi
+          git clone "https://x-access-token:${GH_TOKEN}@github.com/${TAP_REPO}.git" tap
+          cd tap
+          sed -i -E "s|^( *url ).*|\1\"${NEW_URL}\"|" "$FORMULA_PATH"
+          sed -i -E "s|^( *sha256 ).*|\1\"${NEW_SHA}\"|" "$FORMULA_PATH"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet; then
+            echo "Formula already up to date."
+          else
+            git commit -am "claude-switch ${GITHUB_REF_NAME}"
+            git push origin HEAD:main
+          fi

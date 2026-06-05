@@ -65,6 +65,28 @@ The first time the binary reads the protected `Claude Code-credentials` entry,
 macOS shows a one-time Keychain permission dialog — choose **Always Allow**.
 This is expected, not an error.
 
+## Releasing
+
+Releases are automated by `.github/workflows/release.yml`. To ship a new version:
+
+```
+# 1. bump the version in Cargo.toml (e.g. 0.1.0 -> 0.2.0), commit it
+# 2. tag the matching version and push the tag:
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+The workflow then verifies the tag matches `Cargo.toml`, runs the tests, creates
+the GitHub Release, and bumps `url` + `sha256` in the Homebrew tap formula.
+
+**One-time setup:** the workflow needs a repo secret `HOMEBREW_TAP_TOKEN` — a
+Personal Access Token with **Contents: read & write** on `fansilva1991/homebrew-tap`.
+Create a fine-grained PAT (GitHub → Settings → Developer settings → Fine-grained
+tokens), scope it to that repo, then:
+
+```
+gh secret set HOMEBREW_TAP_TOKEN -R fansilva1991/claude-switch
+```
+
 ## Safety
 
 - A pre-swap backup of the live credential + read-back-verified writes mean an
