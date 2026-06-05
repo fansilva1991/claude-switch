@@ -1,0 +1,21 @@
+[package]
+name = "claude-switch"
+version = "0.1.0"
+edition = "2021"
+description = "Manage and switch between multiple Claude Code accounts on macOS"
+
+[[bin]]
+name = "claude-switch"
+path = "src/main.rs"
+
+[dependencies]
+clap = { version = "4", features = ["derive"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+inquire = "0.7"
+chrono = { version = "0.4", default-features = false, features = ["std", "clock", "serde"] }
+
+[profile.release]
+strip = true
+lto = true
